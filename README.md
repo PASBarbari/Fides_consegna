@@ -1,10 +1,8 @@
-Try docker-compose up --build in Dockers
+#Try docker-compose up --build in Dockers
 
-if it doesn't work :
+##if it doesn't work :
 
-
-
-to start go to Back-End
+###to start go to Back-End
 
 
 create a venv: 
