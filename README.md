@@ -1,3 +1,9 @@
+Try docker-compose up --build in Dockers
+
+if it doesn't work :
+
+
+
 to start go to Back-End
 
 

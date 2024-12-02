@@ -9,34 +9,12 @@ services:
     ports:
       - "5434:5432"
     networks:
-      - usertask_network
-      - exporters_network
+      - back-end
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pasquale -d usertask_db"]
       interval: 30s
       timeout: 10s
       retries: 5
-    env_file:
-      - ./usertask_service/.env
-
-  usertask_service:
-    build:
-      context: ./usertask_service
-      dockerfile: Dockerfile
-    container_name: container_usertask_service
-    ports:
-      - "8002:8000"
-    networks:
-      - usertask_network
-      - auth_network
-      - notification_network
-    depends_on:
-      usertask_db:
-        condition: service_healthy
-      loginservice:
-        condition: service_healthy
-    env_file:
-      - ./usertask_service/.env
 
   login_db:
     build:
@@ -46,33 +24,9 @@ services:
     ports:
       - "5435:5432"
     networks:
-      - login_network
-      - exporters_network
+      - back-end
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pasquale -d login_db"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    env_file:
-      - ./loginservice/.env
-
-  loginservice:
-    build:
-      context: ./loginservice
-      dockerfile: Dockerfile
-    container_name: container_loginService
-    ports:
-      - "8000:8000"
-    networks:
-      - login_network
-      - auth_network
-    env_file:
-      - ./loginservice/.env
-    depends_on:
-      login_db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/login/health/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -85,36 +39,12 @@ services:
     ports:
       - "5436:5432"
     networks:
-      - exporters_network
-      - chat_network
+      - back-end
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pasquale -d chat_db"]
       interval: 30s
       timeout: 10s
       retries: 5
-    env_file:
-      - ./chatservice/.env
-  
-  chatservice:
-    build:
-      context: ./chatservice
-      dockerfile: Dockerfile
-    container_name: container_chat_service
-    ports:
-      - "8001:8000"
-    networks:
-      - chat_network
-      - notification_network
-      - auth_network
-    depends_on:
-      chat_db:
-        condition: service_healthy
-      redis_chat:
-        condition: service_healthy
-      loginservice:
-        condition: service_healthy
-    env_file:
-      - ./chatservice/.env
 
   notification_db:
     build:
@@ -122,7 +52,7 @@ services:
       dockerfile: Dockerfile
     container_name: container_notification_db
     ports:
-      - "5437:5432"
+      - "5438:5432"
     networks:
       - back-end
     healthcheck:
@@ -130,18 +60,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  notification_service:
-    build:
-      context: ./notification_service
-      dockerfile: Dockerfile
-    container_name: container_notification_service
-    ports:
-      - "8003:8000"
-    networks:
-      - internal_notification_network
-      - auth_network
-      - notification_network
 
   redis_chat:
     image: "redis:latest"
@@ -153,8 +71,7 @@ services:
       timeout: 10s
       retries: 5
     networks:
-      - chat_network
-      - exporters_network
+      - back-end
 
   redis_notification:
     image: "redis:latest"
@@ -166,32 +83,18 @@ services:
       timeout: 10s
       retries: 5
     networks:
-      - internal_notification_network
-      - exporters_network
+      - back-end
 
-  redis_taskuser:
-    image: "redis:latest"
-    ports:
-      - "6702:6379"
-    healthcheck:
-        test: ["CMD", "redis-cli", "ping"]
-        interval: 30s
-        timeout: 10s
-        retries: 5
+  celery_worker_notificaton:
+    build:
+      context: ./celery_notification
+      dockerfile: Dockerfile
+    container_name: celery_worker_notification
     networks:
-      - usertask_network
-      - exporters_network
-
-  # celery_worker_notificaton:
-  #   build:
-  #     context: ./celery_notification
-  #     dockerfile: Dockerfile
-  #   container_name: celery_worker_notification
-  #   networks:
-  #     - back-end
-  #   depends_on:
-  #     - notification_db
-  #     - redis_notification
+      - back-end
+    depends_on:
+      - notification_db
+      - redis_notification
 
   prometheus:
     build:
@@ -203,8 +106,7 @@ services:
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks:
-      - exporters_network
-      - logging_network
+      - back-end
 
   loki:
     build:
@@ -217,8 +119,7 @@ services:
       - ./loki/loki-config.yaml:/etc/loki/local-config.yaml
       - loki-data:/var/lib/loki
     networks:
-      - exporters_network
-      - logging_network
+      - back-end
 
   grafana:
     build:
@@ -236,8 +137,8 @@ services:
       - prometheus
       - loki
     networks:
-      - logging_network
-      - exporters_network
+      - back-end
+
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
@@ -257,7 +158,7 @@ services:
     ports:
       - "9187:9187"
     networks:
-      - exporters_network
+      - back-end
     depends_on:
       - usertask_db
       - login_db
@@ -271,28 +172,12 @@ services:
     ports:
       - "9121:9121"
     networks:
-      - exporters_network
+      - back-end
 volumes:
   prometheus_data: {}
   loki-data: {}
   grafana-data: {}
 
 networks:
-  usertask_network:
-    driver: bridge
-  chat_network:
-    driver: bridge
-  login_network:
-    driver: bridge
-  internal_notification_network:
-    driver: bridge
-  exporters_network:
-    driver: bridge
-  auth_network:
-    driver: bridge
-  logging_network:
-    driver: bridge
-  notification_network:
-    driver: bridge
   back-end:
     driver: bridge
